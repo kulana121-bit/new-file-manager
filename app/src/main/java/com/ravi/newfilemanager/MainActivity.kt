@@ -39,6 +39,7 @@ import com.ravi.newfilemanager.ui.PhotoViewerScreen
 import com.ravi.newfilemanager.ui.Route
 import com.ravi.newfilemanager.ui.SearchScreen
 import com.ravi.newfilemanager.ui.SettingsScreen
+import com.ravi.newfilemanager.ui.VaultCategoryScreen
 import com.ravi.newfilemanager.ui.VaultUnlockedScreen
 import com.ravi.newfilemanager.ui.VideoPlayerScreen
 import com.ravi.newfilemanager.ui.theme.NewFileManagerTheme
