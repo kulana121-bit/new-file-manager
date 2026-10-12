@@ -36,8 +36,6 @@ import com.ravi.newfilemanager.ui.LocalDarkMode
 import com.ravi.newfilemanager.ui.LockedFilesScreen
 import com.ravi.newfilemanager.ui.PdfReaderScreen
 import com.ravi.newfilemanager.ui.PhotoViewerScreen
-import com.ravi.newfilemanager.ui.PrivatePhotosScreen
-import com.ravi.newfilemanager.ui.VaultCategoryScreen
 import com.ravi.newfilemanager.ui.Route
 import com.ravi.newfilemanager.ui.SearchScreen
 import com.ravi.newfilemanager.ui.SettingsScreen
