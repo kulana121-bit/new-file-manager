@@ -55,10 +55,13 @@
 - GitHub Actions for release APK builds
 - Debug + Release workflows
 
-## Status
+## Status (2026-10-12)
 - [x] Repo created
-- [ ] Project scaffold
-- [ ] Core file browsing
-- [ ] Dashboard (Concept G)
-- [ ] v1 features
-- [ ] First release build
+- [x] Full app written — all 13 locked screens + 2 bottom sheets
+  (dashboard, browse, search, settings, PIN, vault, private photos,
+  internal storage, photo/video/audio players, PDF reader, HTML viewer)
+- [x] Real backends: MediaStore, StatFs, AES-256-GCM vault (PBKDF2),
+  SAF folders, PdfRenderer, MediaPlayer/VideoView, WebView
+- [x] Cloud/Drive stubbed behind CloudProvider (enable later, no rework)
+- [x] R8 release build wired (proven keep-all recipe), signed via GitHub Secrets
+- [ ] Actions release build + APK download + delivery

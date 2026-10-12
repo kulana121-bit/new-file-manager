@@ -224,7 +224,7 @@ private fun ScreenHeaderDark(
                 .clip(CircleShape)
                 .background(Color(0x1FFFFFFF))
         ) {
-            Icon(ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(18.dp))
         }
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Text(badge, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White,
@@ -240,7 +240,7 @@ private fun ScreenHeaderDark(
                 .clip(CircleShape)
                 .background(Color(0x1FFFFFFF))
         ) {
-            Icon(MoreHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
         }
     }
 }
