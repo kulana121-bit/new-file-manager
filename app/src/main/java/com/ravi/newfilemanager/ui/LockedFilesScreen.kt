@@ -1,6 +1,7 @@
 package com.ravi.newfilemanager.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -170,32 +171,15 @@ fun LockedFilesScreen(
                             .size(14.dp)
                             .clip(CircleShape)
                             .background(
-                                if (filled) TextMuted else Color.Transparent
+                                if (filled) TextMuted
+                                else Color.Transparent
                             )
-                            .then(
-                                if (!filled) Modifier.background(
-                                    Color.Transparent,
-                                    CircleShape
-                                ) else Modifier
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!filled) {
-                            Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.Transparent)
-                            ) {
-                                // Outer ring
-                                androidx.compose.foundation.border(
-                                    1.5.dp,
-                                    TextMuted.copy(alpha = 0.4f),
-                                    CircleShape
-                                )
-                            }
-                        }
-                    }
+                            .border(
+                                1.5.dp,
+                                TextMuted.copy(alpha = 0.4f),
+                                CircleShape
+                            )
+                    )
                 }
             }
 
