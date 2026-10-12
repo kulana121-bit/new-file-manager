@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import com.ravi.newfilemanager.ui.DashboardScreen
 import com.ravi.newfilemanager.ui.FileBrowserScreen
 import com.ravi.newfilemanager.ui.LockedFilesScreen
+import com.ravi.newfilemanager.ui.PrivatePhotosScreen
 import com.ravi.newfilemanager.ui.SettingsScreen
 import com.ravi.newfilemanager.ui.VaultUnlockedScreen
 import com.ravi.newfilemanager.ui.theme.NewFileManagerTheme
@@ -45,7 +46,11 @@ class MainActivity : ComponentActivity() {
                             onUnlock = { screen = "vault" }
                         )
                         "vault" -> VaultUnlockedScreen(
-                            onBack = { screen = "dashboard" }
+                            onBack = { screen = "dashboard" },
+                            onCategoryClick = { screen = "private_photos" }
+                        )
+                        "private_photos" -> PrivatePhotosScreen(
+                            onBack = { screen = "vault" }
                         )
                     }
                 }
