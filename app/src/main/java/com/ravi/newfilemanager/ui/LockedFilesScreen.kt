@@ -34,24 +34,75 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ravi.newfilemanager.data.VaultManager
 
-private val BgColor = Color(0xFFE8EDF3)
-private val CardColor = Color(0xFFF2F5F9)
-private val TextDark = Color(0xFF2B3445)
-private val TextMuted = Color(0xFF8A94A6)
 private val LockBlue = Color(0xFF7AA8E8)
 private val LockBlueLight = Color(0xFFB8D4F5)
 
 @Composable
 fun LockedFilesScreen(
     onBack: () -> Unit = {},
-    onUnlock: () -> Unit = {}
+    onUnlock: (pin: String) -> Unit = {}
 ) {
+    val ctx = LocalContext.current
+    val vault = remember { VaultManager(ctx) }
+    val setupMode = remember { !vault.hasPin() }
+
     var pin by remember { mutableStateOf("") }
+    var firstEntry by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun submit() {
+        if (setupMode) {
+            if (firstEntry == null) {
+                firstEntry = pin
+                pin = ""
+                error = null
+            } else {
+                if (pin == firstEntry) {
+                    try {
+                        vault.setPin(pin)
+                        onUnlock(pin)
+                    } catch (e: Exception) {
+                        error = "Could not save passcode"
+                        firstEntry = null; pin = ""
+                    }
+                } else {
+                    error = "Passcodes don't match, try again"
+                    firstEntry = null; pin = ""
+                }
+            }
+        } else {
+            try {
+                if (vault.verifyPin(pin)) onUnlock(pin)
+                else { error = "Wrong passcode"; pin = "" }
+            } catch (e: Exception) {
+                error = "Something went wrong"; pin = ""
+            }
+        }
+    }
+
+    fun press(d: String) {
+        if (pin.length < 4) {
+            pin += d
+            if (pin.length == 4) submit()
+        }
+    }
+
+    val title = if (setupMode) {
+        if (firstEntry == null) "Set a 4-digit\npasscode" else "Confirm your\npasscode"
+    } else "Your Secured Storage\nis Locked"
+    val subtitle = when {
+        error != null -> null
+        setupMode && firstEntry == null -> "Choose a 4-digit passcode"
+        setupMode -> "Enter it once more"
+        else -> "Enter your 4-digit passcode to unlock"
+    }
 
     Column(
         modifier = Modifier
@@ -77,19 +128,9 @@ fun LockedFilesScreen(
                     .clickable { onBack() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = TextDark,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextDark, modifier = Modifier.size(18.dp))
             }
-            Text(
-                "Locked Files",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextDark
-            )
+            Text("Locked Files", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -99,12 +140,7 @@ fun LockedFilesScreen(
                     .clickable { },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    tint = TextDark,
-                    modifier = Modifier.size(16.dp)
-                )
+                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextDark, modifier = Modifier.size(16.dp))
             }
         }
 
@@ -120,7 +156,6 @@ fun LockedFilesScreen(
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Lock icon with glow
             Box(
                 modifier = Modifier
                     .size(88.dp)
@@ -129,33 +164,21 @@ fun LockedFilesScreen(
                     .background(LockBlueLight),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.Lock,
-                    contentDescription = "Locked",
-                    tint = LockBlue,
-                    modifier = Modifier.size(44.dp)
-                )
+                Icon(Icons.Default.Lock, contentDescription = "Locked", tint = LockBlue, modifier = Modifier.size(44.dp))
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Text(
-                "Your Secured Storage\nis Locked",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextDark,
-                textAlign = TextAlign.Center,
-                lineHeight = 24.sp
-            )
+            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark,
+                textAlign = TextAlign.Center, lineHeight = 24.sp)
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                "Enter your 4-digit passcode to unlock",
-                fontSize = 12.sp,
-                color = TextMuted,
-                textAlign = TextAlign.Center
-            )
+            if (error != null) {
+                Text(error!!, fontSize = 12.sp, color = Color(0xFFE5484D), textAlign = TextAlign.Center)
+            } else if (subtitle != null) {
+                Text(subtitle, fontSize = 12.sp, color = TextMuted, textAlign = TextAlign.Center)
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -170,15 +193,8 @@ fun LockedFilesScreen(
                         modifier = Modifier
                             .size(14.dp)
                             .clip(CircleShape)
-                            .background(
-                                if (filled) TextMuted
-                                else Color.Transparent
-                            )
-                            .border(
-                                1.5.dp,
-                                TextMuted.copy(alpha = 0.4f),
-                                CircleShape
-                            )
+                            .background(if (filled) TextMuted else Color.Transparent)
+                            .border(1.5.dp, TextMuted.copy(alpha = 0.4f), CircleShape)
                     )
                 }
             }
@@ -197,65 +213,26 @@ fun LockedFilesScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     row.forEach { digit ->
-                        KeypadButton(
-                            text = digit,
-                            onClick = {
-                                if (pin.length < 4) {
-                                    pin += digit
-                                    if (pin.length == 4) {
-                                        // TODO: verify PIN
-                                        onUnlock()
-                                    }
-                                }
-                            }
-                        )
+                        KeypadButton(text = digit, onClick = { press(digit) })
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Bottom row: X, 0, backspace
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { pin = "" },
-                    modifier = Modifier.size(64.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Clear",
-                        tint = TextMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
+                IconButton(onClick = { pin = "" }, modifier = Modifier.size(64.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(20.dp))
                 }
-                KeypadButton(
-                    text = "0",
-                    onClick = {
-                        if (pin.length < 4) {
-                            pin += "0"
-                            if (pin.length == 4) {
-                                onUnlock()
-                            }
-                        }
-                    }
-                )
+                KeypadButton(text = "0", onClick = { press("0") })
                 IconButton(
-                    onClick = {
-                        if (pin.isNotEmpty()) {
-                            pin = pin.dropLast(1)
-                        }
-                    },
+                    onClick = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
                     modifier = Modifier.size(64.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Backspace,
-                        contentDescription = "Delete",
-                        tint = TextMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Icon(Icons.Default.Backspace, contentDescription = "Delete", tint = TextMuted, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -276,11 +253,6 @@ private fun KeypadButton(
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = TextDark
-        )
+        Text(text, fontSize = 20.sp, fontWeight = FontWeight.Medium, color = Color(0xFF2B3445))
     }
 }

@@ -40,16 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val BgColor = Color(0xFFE8EDF3)
-private val CardColor = Color(0xFFF2F5F9)
-private val TextDark = Color(0xFF2B3445)
-private val TextMuted = Color(0xFF8A94A6)
 private val GreenTint = Color(0xFFD4EDDA)
 private val GreenIcon = Color(0xFF4CAF6D)
 
-private val PeachCard = Color(0xFFFFD9C7)
-private val PurpleCard = Color(0xFFE3D4F5)
-private val BlueCard = Color(0xFFCFE0F5)
 
 @Composable
 fun VaultUnlockedScreen(

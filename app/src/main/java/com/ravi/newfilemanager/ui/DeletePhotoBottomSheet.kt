@@ -31,14 +31,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val CardColor = Color(0xFFF2F5F9)
-private val TextDark = Color(0xFF2B3445)
+import com.ravi.newfilemanager.data.CloudProviders
 
 @Composable
 fun DeletePhotoBottomSheet(
+    count: Int,
     onDismiss: () -> Unit,
-    onOptionSelected: (String) -> Unit = {}
+    onRemoveFromDevice: () -> Unit,
+    onDeleteFromBoth: () -> Unit,
+    onToast: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -57,7 +58,6 @@ fun DeletePhotoBottomSheet(
                 .padding(horizontal = 20.dp)
                 .padding(top = 8.dp, bottom = 24.dp)
         ) {
-            // Handle
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
@@ -68,46 +68,34 @@ fun DeletePhotoBottomSheet(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Title + close
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Spacer(modifier = Modifier.width(40.dp))
-                Text(
-                    "Delete Photo",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextDark
-                )
+                Text("Delete Photo", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Box(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFE8EDF3))
+                        .background(LineColor)
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color(0xFF8A94A6),
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TextMuted, modifier = Modifier.size(16.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Options
             BottomSheetOption(
                 icon = Icons.Default.DeleteForever,
                 iconTint = Color(0xFFE85D5D),
                 iconBg = Color(0xFFFFD4D4),
                 title = "Remove from device",
-                subtitle = "Delete this file permanently from this device and the vault.",
-                onClick = { onOptionSelected("device"); onDismiss() }
+                subtitle = "Delete ${if (count > 1) "$count files" else "this file"} permanently from this device and the vault.",
+                onClick = { onRemoveFromDevice(); onDismiss() }
             )
             BottomSheetOption(
                 icon = Icons.Default.CloudOff,
@@ -115,7 +103,7 @@ fun DeletePhotoBottomSheet(
                 iconBg = Color(0xFFD4E4F7),
                 title = "Remove from cloud",
                 subtitle = "Delete this file from linked cloud storage, but keep on this device",
-                onClick = { onOptionSelected("cloud"); onDismiss() }
+                onClick = { onToast(CloudProviders.current.comingSoonMessage) }
             )
             BottomSheetOption(
                 icon = Icons.Default.Warning,
@@ -123,28 +111,22 @@ fun DeletePhotoBottomSheet(
                 iconBg = Color(0xFFFFE4C7),
                 title = "Delete from both",
                 subtitle = "Permanently delete this file from both the device and your cloud",
-                onClick = { onOptionSelected("both"); onDismiss() }
+                onClick = { onDeleteFromBoth(); onDismiss() }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Cancel button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .shadow(4.dp, RoundedCornerShape(20.dp))
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color.White)
+                    .background(CardColor)
                     .clickable { onDismiss() }
                     .padding(vertical = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    "Cancel",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = TextDark
-                )
+                Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextDark)
             }
         }
     }

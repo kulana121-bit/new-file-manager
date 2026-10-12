@@ -43,10 +43,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ravi.newfilemanager.data.FileItem
 import com.ravi.newfilemanager.data.formatFileSize
 
-private val BgColor = Color(0xFFE8EDF3)
-private val CardColor = Color(0xFFF2F5F9)
-private val TextDark = Color(0xFF2B3445)
-private val TextMuted = Color(0xFF8A94A6)
 
 @Composable
 fun FileBrowserScreen(

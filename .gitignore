@@ -1,0 +1,17 @@
+# helpers (local only, never commit)
+gh.py
+make_keystore.py
+
+# keystores (lives in GitHub Secrets + ~/workspace/release-keystores backup)
+*.p12
+*.keystore
+*.jks
+
+# android / gradle
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.DS_Store

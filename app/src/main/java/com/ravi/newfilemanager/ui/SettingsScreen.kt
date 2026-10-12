@@ -13,194 +13,281 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val BgColor = Color(0xFFE8EDF3)
-private val CardColor = Color(0xFFF2F5F9)
-private val TextDark = Color(0xFF2B3445)
-private val TextMuted = Color(0xFF8A94A6)
+import com.ravi.newfilemanager.data.CloudProviders
+import com.ravi.newfilemanager.data.Prefs
+import com.ravi.newfilemanager.data.StorageStats
+import com.ravi.newfilemanager.data.formatFileSize
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit = {},
-    onLockedFiles: () -> Unit = {}
+    go: (Route) -> Unit,
+    onToast: (String) -> Unit,
+    dark: Boolean,
+    onDarkChange: (Boolean) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgColor)
-            .padding(horizontal = 20.dp)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
+    val ctx = LocalContext.current
+    val prefs = remember { Prefs(ctx) }
+    var cacheSize by remember { mutableStateOf(0L) }
+    var showAutoLock by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
+    var showBreakdown by remember { mutableStateOf(false) }
+    var showCloudSoon by remember { mutableStateOf(false) }
+    var storage by remember { mutableStateOf(StorageStats.Info(0, 0)) }
 
-        // Top bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .shadow(4.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(CardColor)
-                    .clickable { onBack() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = TextDark,
-                    modifier = Modifier.size(18.dp)
-                )
+    fun refreshCache() {
+        cacheSize = try {
+            ctx.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        } catch (_: Exception) { 0L }
+    }
+    LaunchedEffect(Unit) {
+        refreshCache()
+        storage = withContext(Dispatchers.IO) { StorageStats.primary() }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(BgColor)) {
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+            Spacer(modifier = Modifier.height(16.dp))
+            TopTitle("Settings")
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                // SECURITY & VAULT
+                item {
+                    GroupLabel("SECURITY & VAULT")
+                    CardBox {
+                        SettingRow(
+                            icon = Icons.Default.Lock, iconBg = PinkCard, iconTint = PinkText,
+                            title = "Passcode & Face ID", value = if (prefs.hasPin) "On" else "Off",
+                            onClick = { go(Route("locked")) }
+                        )
+                        SettingRow(
+                            icon = Icons.Default.Timer, iconBg = BlueCard, iconTint = BlueText,
+                            title = "Auto-Lock Timer",
+                            value = when (prefs.autoLockMinutes) {
+                                0 -> "Immediately"; 1 -> "After 1 minute"; 5 -> "After 5 minutes"; else -> "After 15 minutes"
+                            },
+                            onClick = { showAutoLock = true }
+                        )
+                    }
+                }
+                // STORAGE & CLOUD
+                item {
+                    GroupLabel("STORAGE & CLOUD")
+                    CardBox {
+                        SettingRow(
+                            icon = Icons.Default.Cloud, iconBg = GreenCard, iconTint = GreenText,
+                            title = "Manage Cloud Drives",
+                            value = if (CloudProviders.current.isAvailable) "Connected" else "Google Drive, iCloud",
+                            onClick = {
+                                if (CloudProviders.current.isAvailable) onToast("Cloud drives in next update")
+                                else showCloudSoon = true
+                            }
+                        )
+                        SettingRow(
+                            icon = Icons.Default.CleaningServices, iconBg = CreamCard, iconTint = CreamText,
+                            title = "Clear App Cache", value = formatFileSize(cacheSize),
+                            onClick = {
+                                try {
+                                    ctx.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+                                } catch (_: Exception) { }
+                                refreshCache()
+                                onToast("Cache cleared")
+                            }
+                        )
+                        SettingRow(
+                            icon = Icons.Default.Storage, iconBg = BlueCard, iconTint = BlueText,
+                            title = "Storage Breakdown",
+                            onClick = { showBreakdown = true }
+                        )
+                    }
+                }
+                // PREFERENCES & SUPPORT
+                item {
+                    GroupLabel("PREFERENCES & SUPPORT")
+                    CardBox {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(13.dp)
+                        ) {
+                            SettingIcon(Icons.Default.DarkMode, CreamCard, CreamText)
+                            Text("Dark Mode", fontSize = 14.5.sp, fontWeight = FontWeight.Medium, color = TextDark,
+                                modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = dark,
+                                onCheckedChange = {
+                                    onDarkChange(it)
+                                    prefs.darkMode = it
+                                    onToast(if (it) "Dark mode on" else "Dark mode off")
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Accent)
+                            )
+                        }
+                        SettingRow(
+                            icon = Icons.Default.Help, iconBg = PurpleCard, iconTint = PurpleText,
+                            title = "Help & Support",
+                            onClick = { onToast("Help & Support in next update") }
+                        )
+                        SettingRow(
+                            icon = Icons.Default.Info, iconBg = BlueCard, iconTint = BlueText,
+                            title = "About", value = "v1.0.0",
+                            onClick = { showAbout = true }
+                        )
+                    }
+                }
+                item { Spacer(modifier = Modifier.height(86.dp)) }
             }
-            Text(
-                "Settings",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextDark
-            )
         }
+        BottomDock(
+            selected = "settings",
+            onHome = { go(Route("dashboard")) },
+            onBrowse = { go(Route("browse")) },
+            onSettings = {}
+        )
+    }
 
-        Spacer(modifier = Modifier.height(20.dp))
+    if (showAutoLock) {
+        AlertDialog(
+            onDismissRequest = { showAutoLock = false },
+            title = { Text("Auto-Lock Timer") },
+            text = {
+                Column {
+                    listOf(0 to "Immediately", 1 to "After 1 minute", 5 to "After 5 minutes", 15 to "After 15 minutes")
+                        .forEach { (min, label) ->
+                            Text(
+                                label, fontSize = 15.sp, color = TextDark,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        prefs.autoLockMinutes = min
+                                        showAutoLock = false
+                                        onToast("Auto-lock: $label")
+                                    }
+                                    .padding(vertical = 10.dp)
+                            )
+                        }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showAutoLock = false }) { Text("Cancel") } }
+        )
+    }
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            title = { Text("Files v1.0.0") },
+            text = { Text("A clean, fast file manager with a private encrypted vault.\n\nBuilt for Ravi.") },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text("OK") } }
+        )
+    }
+
+    if (showBreakdown) {
+        AlertDialog(
+            onDismissRequest = { showBreakdown = false },
+            title = { Text("Storage Breakdown") },
+            text = {
                 Text(
-                    "Security",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextMuted,
-                    modifier = Modifier.padding(bottom = 4.dp)
+                    "Used: ${formatFileSize(storage.usedBytes)}\n" +
+                    "Free: ${formatFileSize(storage.freeBytes)}\n" +
+                    "Total: ${formatFileSize(storage.totalBytes)}\n\n" +
+                    "Detailed per-app breakdown in next update."
                 )
-                SettingsRow(
-                    icon = Icons.Default.Lock,
-                    iconTint = Color(0xFF7AA8E8),
-                    title = "Locked Files",
-                    subtitle = "PIN-protected secure storage",
-                    onClick = onLockedFiles
-                )
-            }
+            },
+            confirmButton = { TextButton(onClick = { showBreakdown = false }) { Text("OK") } }
+        )
+    }
 
-            item {
-                Text(
-                    "Appearance",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextMuted,
-                    modifier = Modifier.padding(bottom = 4.dp, top = 8.dp)
-                )
-                SettingsRow(
-                    icon = Icons.Default.DarkMode,
-                    iconTint = Color(0xFF9A7ACD),
-                    title = "Dark Mode",
-                    subtitle = "Switch appearance",
-                    onClick = { }
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                SettingsRow(
-                    icon = Icons.Default.Palette,
-                    iconTint = Color(0xFFD9975A),
-                    title = "Theme Color",
-                    subtitle = "Soft pastel accents",
-                    onClick = { }
-                )
-            }
-
-            item {
-                Text(
-                    "About",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextMuted,
-                    modifier = Modifier.padding(bottom = 4.dp, top = 8.dp)
-                )
-                SettingsRow(
-                    icon = Icons.Default.Info,
-                    iconTint = Color(0xFF7A9A7A),
-                    title = "About",
-                    subtitle = "Version 1.0",
-                    onClick = { }
-                )
-            }
-        }
+    if (showCloudSoon) {
+        AlertDialog(
+            onDismissRequest = { showCloudSoon = false },
+            title = { Text("Cloud Drive") },
+            text = { Text(CloudProviders.current.comingSoonMessage) },
+            confirmButton = { TextButton(onClick = { showCloudSoon = false }) { Text("OK") } }
+        )
     }
 }
 
 @Composable
-private fun SettingsRow(
-    icon: ImageVector,
-    iconTint: Color,
-    title: String,
-    subtitle: String,
+private fun GroupLabel(text: String) {
+    Text(
+        text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted,
+        modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun CardBox(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(CardColor)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+    ) { content() }
+}
+
+@Composable
+private fun SettingIcon(icon: ImageVector, bg: Color, tint: Color) {
+    Box(
+        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(bg),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun SettingRow(
+    icon: ImageVector, iconBg: Color, iconTint: Color,
+    title: String, value: String? = null,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(18.dp))
-            .clip(RoundedCornerShape(18.dp))
-            .background(CardColor)
             .clickable { onClick() }
-            .padding(16.dp),
+            .padding(horizontal = 10.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(13.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(iconTint.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextDark
-            )
-            Text(
-                subtitle,
-                fontSize = 11.sp,
-                color = TextMuted
-            )
-        }
-        Icon(
-            Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = TextMuted,
-            modifier = Modifier.size(20.dp)
-        )
+        SettingIcon(icon, iconBg, iconTint)
+        Text(title, fontSize = 14.5.sp, fontWeight = FontWeight.Medium, color = TextDark, modifier = Modifier.weight(1f))
+        if (value != null) Text(value, fontSize = 12.5.sp, color = TextMuted)
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextMuted, modifier = Modifier.size(16.dp))
     }
 }

@@ -1,5 +1,10 @@
 package com.ravi.newfilemanager.ui
 
+import android.content.Context
+import android.net.Uri
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,36 +24,111 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val CardColor = Color(0xFFF2F5F9)
-private val TextDark = Color(0xFF2B3445)
-private val TextMuted = Color(0xFF8A94A6)
+import androidx.core.content.FileProvider
+import com.ravi.newfilemanager.data.CloudProviders
+import com.ravi.newfilemanager.data.Kind
+import com.ravi.newfilemanager.data.VaultManager
+import com.ravi.newfilemanager.data.kindFromMime
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 @Composable
 fun AddPhotoBottomSheet(
+    pin: String,
+    category: String = "photos",
     onDismiss: () -> Unit,
-    onOptionSelected: (String) -> Unit = {}
+    onLocked: () -> Unit,
+    onToast: (String) -> Unit
 ) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val vault = remember { VaultManager(ctx) }
+    var busy by remember { mutableStateOf(false) }
+
+    val cameraFile = remember { File(ctx.cacheDir, "cam_${System.currentTimeMillis()}.jpg") }
+    val cameraUri = remember {
+        FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", cameraFile)
+    }
+
+    fun lockUri(uri: Uri) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                busy = true
+                val name = queryName(ctx, uri) ?: "photo_${System.currentTimeMillis()}.jpg"
+                val mime = ctx.contentResolver.getType(uri) ?: "image/jpeg"
+                val cat = when (kindFromMime(mime)) {
+                    Kind.IMAGE -> "photos"
+                    Kind.VIDEO -> "videos"
+                    Kind.AUDIO -> "audio"
+                    else -> "docs"
+                }
+                vault.lockUri(uri, name, mime, if (category == "photos") "photos" else cat, pin)
+                try { ctx.contentResolver.delete(uri, null, null) } catch (_: Exception) { }
+                withContext(Dispatchers.Main) {
+                    busy = false
+                    onLocked(); onDismiss(); onToast("Locked into vault")
+                }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) { busy = false; onToast("Could not lock file") }
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { ok ->
+        if (ok) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    busy = true
+                    cameraFile.inputStream().use { ins ->
+                        vault.lockStream(ins, cameraFile.name, "image/jpeg", "photos", pin)
+                    }
+                    cameraFile.delete()
+                    withContext(Dispatchers.Main) {
+                        busy = false; onLocked(); onDismiss(); onToast("Photo locked into vault")
+                    }
+                } catch (_: Exception) {
+                    withContext(Dispatchers.Main) { busy = false; onToast("Could not lock photo") }
+                }
+            }
+        }
+    }
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> if (uri != null) lockUri(uri) }
+    val filesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) lockUri(uri) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.4f))
-            .clickable { onDismiss() },
+            .clickable { if (!busy) onDismiss() },
         contentAlignment = Alignment.BottomCenter
     ) {
         Column(
@@ -61,7 +141,6 @@ fun AddPhotoBottomSheet(
                 .padding(horizontal = 20.dp)
                 .padding(top = 8.dp, bottom = 24.dp)
         ) {
-            // Handle
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
@@ -72,90 +151,63 @@ fun AddPhotoBottomSheet(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Title + close
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Spacer(modifier = Modifier.width(40.dp))
-                Text(
-                    "Add to Private Photos",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextDark
-                )
+                Text("Add to Private Photos", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Box(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFE8EDF3))
-                        .clickable { onDismiss() },
+                        .background(LineColor)
+                        .clickable { if (!busy) onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = TextMuted,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TextMuted, modifier = Modifier.size(16.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Options
             BottomSheetOption(
-                icon = Icons.Default.CameraAlt,
-                iconTint = Color(0xFFD9975A),
-                iconBg = Color(0xFFFFD9C7),
-                title = "Take Photo",
-                subtitle = "Use camera to capture directly into vault",
-                onClick = { onOptionSelected("camera"); onDismiss() }
+                icon = Icons.Default.CameraAlt, iconTint = PeachText, iconBg = PeachCard,
+                title = "Take Photo", subtitle = "Use camera to capture directly into vault",
+                onClick = { cameraLauncher.launch(cameraUri) }
             )
             BottomSheetOption(
-                icon = Icons.Default.PhotoLibrary,
-                iconTint = Color(0xFF7A9ACD),
-                iconBg = Color(0xFFCFE0F5),
-                title = "Import from Gallery",
-                subtitle = "Select from your device's library",
-                onClick = { onOptionSelected("gallery"); onDismiss() }
+                icon = Icons.Default.PhotoLibrary, iconTint = PurpleText, iconBg = PurpleCard,
+                title = "Import from Gallery", subtitle = "Select from your device's library",
+                onClick = { galleryLauncher.launch("image/*") }
             )
             BottomSheetOption(
-                icon = Icons.Default.Folder,
-                iconTint = Color(0xFF7A9A7A),
-                iconBg = Color(0xFFCDEAC0),
-                title = "Upload from Files",
-                subtitle = "Choose from local device storage",
-                onClick = { onOptionSelected("files"); onDismiss() }
+                icon = Icons.Default.FolderOpen, iconTint = GreenText, iconBg = GreenCard,
+                title = "Upload from Files", subtitle = "Choose from local device storage",
+                onClick = { filesLauncher.launch(arrayOf("image/*")) }
             )
             BottomSheetOption(
-                icon = Icons.Default.CloudDownload,
-                iconTint = Color(0xFF5B8DE8),
-                iconBg = Color(0xFFD4E4F7),
-                title = "Cloud Import",
-                subtitle = "Fetch from linked drive or cloud",
-                onClick = { onOptionSelected("cloud"); onDismiss() }
+                icon = Icons.Default.CloudUpload, iconTint = BlueText, iconBg = BlueCard,
+                title = "Cloud Import", subtitle = "Fetch from linked drive or cloud",
+                onClick = { onToast(CloudProviders.current.comingSoonMessage) }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Cancel button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .shadow(4.dp, RoundedCornerShape(20.dp))
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color.White)
-                    .clickable { onDismiss() }
+                    .background(CardColor)
+                    .clickable { if (!busy) onDismiss() }
                     .padding(vertical = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "Cancel",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = TextDark
+                    if (busy) "Locking..." else "Cancel",
+                    fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextDark
                 )
             }
         }
@@ -186,31 +238,20 @@ fun BottomSheetOption(
                 .background(iconBg),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextDark
-            )
-            Text(
-                subtitle,
-                fontSize = 11.sp,
-                color = TextMuted
-            )
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextDark)
+            Text(subtitle, fontSize = 11.sp, color = TextMuted)
         }
-        Icon(
-            Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = TextMuted.copy(alpha = 0.5f),
-            modifier = Modifier.size(18.dp)
-        )
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextMuted.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
     }
+}
+
+fun queryName(ctx: Context, uri: Uri): String? {
+    return try {
+        ctx.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (_: Exception) { null }
 }
