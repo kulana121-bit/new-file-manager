@@ -62,7 +62,9 @@ private val GreenCard = Color(0xFFCDEAC0)
 private val GreenText = Color(0xFF2E6B2E)
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(
+    onNavigate: (String) -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -289,19 +291,25 @@ fun DashboardScreen() {
                 Icons.Default.Home,
                 contentDescription = "Home",
                 tint = TextDark,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onNavigate("dashboard") }
             )
             Icon(
                 Icons.Default.GridView,
                 contentDescription = "Files",
                 tint = TextMuted,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onNavigate("browser") }
             )
             Icon(
                 Icons.Default.Settings,
                 contentDescription = "Settings",
                 tint = TextMuted,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onNavigate("settings") }
             )
         }
     }
