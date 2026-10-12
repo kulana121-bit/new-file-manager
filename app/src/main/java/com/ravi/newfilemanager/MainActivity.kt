@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +37,7 @@ import com.ravi.newfilemanager.ui.LockedFilesScreen
 import com.ravi.newfilemanager.ui.PdfReaderScreen
 import com.ravi.newfilemanager.ui.PhotoViewerScreen
 import com.ravi.newfilemanager.ui.PrivatePhotosScreen
+import com.ravi.newfilemanager.ui.VaultCategoryScreen
 import com.ravi.newfilemanager.ui.Route
 import com.ravi.newfilemanager.ui.SearchScreen
 import com.ravi.newfilemanager.ui.SettingsScreen
@@ -76,6 +78,12 @@ fun FileManagerApp() {
         if (stack.size > 1) stack.removeLast()
     }
     val route = stack.last()
+
+    // System back / gesture: go to previous screen instead of closing the app.
+    // Only the dashboard (root) closes the app.
+    BackHandler(enabled = stack.size > 1) {
+        back()
+    }
 
     // Lock a normal file into the vault (viewers call this; PIN collected via locked screen)
     fun requestLock(item: MediaItem) {
@@ -140,14 +148,30 @@ fun FileManagerApp() {
                             if (item != null) doLock(item, pin) else go(Route("vault"))
                         }
                     )
-                    "vault" -> VaultUnlockedScreen(
-                        onBack = ::back,
-                        onCategoryClick = { go(Route("private_photos")) }
-                    )
-                    "private_photos" -> {
+                    "vault" -> {
                         val pin = vaultPin
                         if (pin != null) {
-                            PrivatePhotosScreen(pin = pin, onBack = ::back, go = ::go, onToast = onToast)
+                            VaultUnlockedScreen(
+                                pin = pin,
+                                onBack = ::back,
+                                onCategoryClick = { cat -> go(Route("vault_category", category = cat)) },
+                                go = ::go,
+                                onToast = onToast
+                            )
+                        } else {
+                            LockedFilesScreen(
+                                onBack = ::back,
+                                onUnlock = { p -> vaultPin = p; go(Route("vault")) }
+                            )
+                        }
+                    }
+                    "vault_category" -> {
+                        val pin = vaultPin
+                        if (pin != null && route.category.isNotBlank()) {
+                            VaultCategoryScreen(
+                                pin = pin, category = route.category,
+                                onBack = ::back, go = ::go, onToast = onToast
+                            )
                         } else {
                             LockedFilesScreen(
                                 onBack = ::back,

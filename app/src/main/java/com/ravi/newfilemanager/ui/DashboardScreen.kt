@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
@@ -37,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,11 +106,17 @@ fun DashboardScreen(
     onToast: (String) -> Unit
 ) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val stats = remember { StorageStats.primary() }
     var recent by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
-    LaunchedEffect(Unit) {
-        recent = withContext(Dispatchers.IO) { MediaStoreRepo.recent(ctx, 8) }
+    var optionsItem by remember { mutableStateOf<MediaItem?>(null) }
+    fun loadRecent() {
+        scope.launch(Dispatchers.IO) {
+            val r = MediaStoreRepo.recent(ctx, 8)
+            withContext(Dispatchers.Main) { recent = r }
+        }
     }
+    LaunchedEffect(Unit) { loadRecent() }
 
     Box(modifier = Modifier.fillMaxSize().background(BgColor)) {
         Column(
@@ -229,15 +237,11 @@ fun DashboardScreen(
                                 if (r != null) go(r) else onToast("Preview not available for this file")
                             },
                             trailing = {
-                                IconButton(onClick = {
-                                    val send = Intent(Intent.ACTION_SEND).apply {
-                                        type = item.mime
-                                        putExtra(Intent.EXTRA_STREAM, item.uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    ctx.startActivity(Intent.createChooser(send, "Share"))
-                                }, modifier = Modifier.size(30.dp)) {
-                                    Icon(Icons.Default.Share, contentDescription = "Share", tint = TextMuted, modifier = Modifier.size(17.dp))
+                                IconButton(
+                                    onClick = { optionsItem = item },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(Icons.Default.MoreHoriz, contentDescription = "Options", tint = TextMuted, modifier = Modifier.size(18.dp))
                                 }
                             }
                         )
@@ -247,11 +251,34 @@ fun DashboardScreen(
             }
         }
         BottomDock(
+            modifier = Modifier.align(Alignment.BottomCenter),
             selected = "home",
             onHome = {},
             onBrowse = { go(Route("browse")) },
             onSettings = { go(Route("settings")) }
         )
+
+        optionsItem?.let { oi ->
+            FileOptionsSheet(
+                item = oi,
+                onDismiss = { optionsItem = null },
+                onOpen = {
+                    val r = oi.toRoute()
+                    if (r != null) go(r) else onToast("Preview not available for this file")
+                },
+                onShare = { shareMediaItem(ctx, oi) },
+                onDelete = {
+                    scope.launch(Dispatchers.IO) {
+                        val ok = deleteMediaItem(ctx, oi)
+                        withContext(Dispatchers.Main) {
+                            onToast(if (ok) "Deleted" else "Could not delete")
+                            loadRecent()
+                        }
+                    }
+                },
+                onToast = onToast
+            )
+        }
     }
 }
 

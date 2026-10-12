@@ -3,6 +3,7 @@ package com.ravi.newfilemanager.ui
 import android.content.Intent
 import android.widget.ImageView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -114,7 +115,8 @@ fun PhotoViewerScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 26.dp, start = 24.dp, end = 24.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(CardColor)
+                .background(GlassColor)
+                .border(1.dp, GlassBorder, RoundedCornerShape(24.dp))
                 .padding(horizontal = 10.dp, vertical = 10.dp)
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,

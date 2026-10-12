@@ -174,6 +174,7 @@ fun SearchScreen(
             }
         }
         BottomDock(
+            modifier = Modifier.align(Alignment.BottomCenter),
             selected = "",
             onHome = { go(Route("dashboard")) },
             onBrowse = { go(Route("browse")) },

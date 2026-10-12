@@ -1,6 +1,7 @@
 package com.ravi.newfilemanager.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,26 +57,35 @@ val PinkCard = Color(0xFFF9D3DE); val PinkText = Color(0xFF8A3E54)
 val CreamCard = Color(0xFFF7E8C4); val CreamText = Color(0xFF7A5A24)
 val Accent = Color(0xFF7A8FE8)
 
+// frosted liquid-glass surface (translucent, never solid)
+val GlassColor: Color @Composable get() =
+    if (LocalDarkMode.current) Color(0xFF1E2942).copy(alpha = 0.62f) else Color.White.copy(alpha = 0.55f)
+val GlassBorder: Color @Composable get() =
+    Color.White.copy(alpha = if (LocalDarkMode.current) 0.18f else 0.6f)
+
 // ---------- small bottom dock (normal size, per user feedback) ----------
 @Composable
 fun BottomDock(
     selected: String,
     onHome: () -> Unit,
     onBrowse: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.BottomCenter
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier
-                .padding(bottom = 14.dp)
-                .shadow(8.dp, RoundedCornerShape(20.dp))
-                .clip(RoundedCornerShape(20.dp))
-                .background(CardColor)
-                .padding(horizontal = 26.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(30.dp),
+                .shadow(10.dp, RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(28.dp))
+                .background(GlassColor)
+                .border(1.dp, GlassBorder, RoundedCornerShape(28.dp))
+                .padding(horizontal = 28.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(32.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             DockIcon(Icons.Default.Home, "Home", selected == "home", onHome)

@@ -158,6 +158,7 @@ fun BrowseScreen(
             }
         }
         BottomDock(
+            modifier = Modifier.align(Alignment.BottomCenter),
             selected = "browse",
             onHome = { go(Route("dashboard")) },
             onBrowse = {},

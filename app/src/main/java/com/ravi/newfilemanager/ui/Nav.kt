@@ -13,5 +13,6 @@ data class Route(
     val kind: Kind = Kind.IMAGE,
     val items: List<MediaItem> = emptyList(),
     val index: Int = 0,
-    val item: MediaItem? = null
+    val item: MediaItem? = null,
+    val category: String = ""
 )

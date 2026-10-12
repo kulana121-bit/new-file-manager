@@ -1,5 +1,6 @@
 package com.ravi.newfilemanager.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,9 @@ fun DeletePhotoBottomSheet(
     onDeleteFromBoth: () -> Unit,
     onToast: (String) -> Unit
 ) {
+    // system back dismisses the sheet instead of leaving the screen
+    BackHandler { onDismiss() }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

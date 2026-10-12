@@ -6,6 +6,7 @@ import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -154,7 +155,8 @@ fun PdfReaderScreen(
                 modifier = Modifier
                     .padding(horizontal = 20.dp, vertical = 14.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(CardColor)
+                    .background(GlassColor)
+                    .border(1.dp, GlassBorder, RoundedCornerShape(24.dp))
                     .padding(horizontal = 6.dp, vertical = 10.dp)
                     .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,

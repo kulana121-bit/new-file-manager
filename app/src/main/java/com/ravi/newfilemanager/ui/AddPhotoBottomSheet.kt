@@ -3,6 +3,7 @@ package com.ravi.newfilemanager.ui
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -59,6 +60,7 @@ import java.io.File
 fun AddPhotoBottomSheet(
     pin: String,
     category: String = "photos",
+    title: String = "Add to Private Photos",
     onDismiss: () -> Unit,
     onLocked: () -> Unit,
     onToast: (String) -> Unit
@@ -68,7 +70,17 @@ fun AddPhotoBottomSheet(
     val vault = remember { VaultManager(ctx) }
     var busy by remember { mutableStateOf(false) }
 
-    val cameraFile = remember { File(ctx.cacheDir, "cam_${System.currentTimeMillis()}.jpg") }
+    val galleryMime = when (category) {
+        "videos" -> "video/*"
+        "audio" -> "audio/*"
+        "docs" -> "*/*"
+        else -> "image/*"
+    }
+    val showCamera = category == "photos" || category == "videos"
+
+    val cameraFile = remember {
+        File(ctx.cacheDir, "cam_${System.currentTimeMillis()}" + if (category == "videos") ".mp4" else ".jpg")
+    }
     val cameraUri = remember {
         FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", cameraFile)
     }
@@ -77,15 +89,9 @@ fun AddPhotoBottomSheet(
         scope.launch(Dispatchers.IO) {
             try {
                 busy = true
-                val name = queryName(ctx, uri) ?: "photo_${System.currentTimeMillis()}.jpg"
-                val mime = ctx.contentResolver.getType(uri) ?: "image/jpeg"
-                val cat = when (kindFromMime(mime)) {
-                    Kind.IMAGE -> "photos"
-                    Kind.VIDEO -> "videos"
-                    Kind.AUDIO -> "audio"
-                    else -> "docs"
-                }
-                vault.lockUri(uri, name, mime, if (category == "photos") "photos" else cat, pin)
+                val name = queryName(ctx, uri) ?: "file_${System.currentTimeMillis()}"
+                val mime = ctx.contentResolver.getType(uri) ?: galleryMime
+                vault.lockUri(uri, name, mime, category, pin)
                 try { ctx.contentResolver.delete(uri, null, null) } catch (_: Exception) { }
                 withContext(Dispatchers.Main) {
                     busy = false
@@ -97,32 +103,38 @@ fun AddPhotoBottomSheet(
         }
     }
 
-    val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { ok ->
-        if (ok) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    busy = true
-                    cameraFile.inputStream().use { ins ->
-                        vault.lockStream(ins, cameraFile.name, "image/jpeg", "photos", pin)
-                    }
-                    cameraFile.delete()
-                    withContext(Dispatchers.Main) {
-                        busy = false; onLocked(); onDismiss(); onToast("Photo locked into vault")
-                    }
-                } catch (_: Exception) {
-                    withContext(Dispatchers.Main) { busy = false; onToast("Could not lock photo") }
+    fun lockCameraFile(mime: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                busy = true
+                cameraFile.inputStream().use { ins ->
+                    vault.lockStream(ins, cameraFile.name, mime, category, pin)
                 }
+                cameraFile.delete()
+                withContext(Dispatchers.Main) {
+                    busy = false; onLocked(); onDismiss(); onToast("Locked into vault")
+                }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) { busy = false; onToast("Could not lock file") }
             }
         }
     }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { ok -> if (ok) lockCameraFile("image/jpeg") }
+    val videoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CaptureVideo()
+    ) { ok -> if (ok) lockCameraFile("video/mp4") }
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri -> if (uri != null) lockUri(uri) }
     val filesLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) lockUri(uri) }
+
+    // system back dismisses the sheet instead of leaving the screen
+    BackHandler(enabled = !busy) { onDismiss() }
 
     Box(
         modifier = Modifier
@@ -157,7 +169,7 @@ fun AddPhotoBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Spacer(modifier = Modifier.width(40.dp))
-                Text("Add to Private Photos", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextDark)
                 Box(
                     modifier = Modifier
                         .size(32.dp)
@@ -172,20 +184,27 @@ fun AddPhotoBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            BottomSheetOption(
-                icon = Icons.Default.CameraAlt, iconTint = PeachText, iconBg = PeachCard,
-                title = "Take Photo", subtitle = "Use camera to capture directly into vault",
-                onClick = { cameraLauncher.launch(cameraUri) }
-            )
+            if (showCamera) {
+                BottomSheetOption(
+                    icon = Icons.Default.CameraAlt, iconTint = PeachText, iconBg = PeachCard,
+                    title = if (category == "videos") "Record Video" else "Take Photo",
+                    subtitle = if (category == "videos") "Use camera to capture directly into vault"
+                    else "Use camera to capture directly into vault",
+                    onClick = {
+                        if (category == "videos") videoLauncher.launch(cameraUri)
+                        else photoLauncher.launch(cameraUri)
+                    }
+                )
+            }
             BottomSheetOption(
                 icon = Icons.Default.PhotoLibrary, iconTint = PurpleText, iconBg = PurpleCard,
                 title = "Import from Gallery", subtitle = "Select from your device's library",
-                onClick = { galleryLauncher.launch("image/*") }
+                onClick = { galleryLauncher.launch(galleryMime) }
             )
             BottomSheetOption(
                 icon = Icons.Default.FolderOpen, iconTint = GreenText, iconBg = GreenCard,
                 title = "Upload from Files", subtitle = "Choose from local device storage",
-                onClick = { filesLauncher.launch(arrayOf("image/*")) }
+                onClick = { filesLauncher.launch(arrayOf(galleryMime)) }
             )
             BottomSheetOption(
                 icon = Icons.Default.CloudUpload, iconTint = BlueText, iconBg = BlueCard,

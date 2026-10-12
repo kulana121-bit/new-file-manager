@@ -17,17 +17,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -51,17 +55,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ravi.newfilemanager.data.Kind
-import com.ravi.newfilemanager.data.MediaItem
 import com.ravi.newfilemanager.data.VaultManager
 import com.ravi.newfilemanager.data.formatFileSize
+import com.ravi.newfilemanager.data.kindFromMime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private fun vaultTitle(cat: String) = when (cat) {
+    "videos" -> "Secure Video"
+    "audio" -> "Private Audio"
+    "docs" -> "Key Documents"
+    else -> "Private Photos"
+}
+
+private fun vaultUnit(cat: String) = when (cat) {
+    "videos" -> "Videos"
+    "audio" -> "Audios"
+    "docs" -> "Documents"
+    else -> "Photos"
+}
+
+private fun vaultAddTitle(cat: String) = when (cat) {
+    "videos" -> "Add to Secure Video"
+    "audio" -> "Add to Private Audio"
+    "docs" -> "Add to Key Documents"
+    else -> "Add to Private Photos"
+}
 
 @Composable
-fun PrivatePhotosScreen(
+fun VaultCategoryScreen(
     pin: String,
+    category: String,
     onBack: () -> Unit,
     go: (Route) -> Unit,
     onToast: (String) -> Unit
@@ -82,17 +110,28 @@ fun PrivatePhotosScreen(
 
     fun reload() {
         scope.launch(Dispatchers.IO) {
-            val list = try { vault.list("photos") } catch (_: Exception) { emptyList() }
+            val list = try { vault.list(category) } catch (_: Exception) { emptyList() }
             withContext(Dispatchers.Main) { entries = list }
         }
     }
-    LaunchedEffect(Unit) { reload() }
+    LaunchedEffect(category) { reload() }
 
     val filtered = remember(entries, query) {
         if (query.isBlank()) entries
         else entries.filter { it.name.contains(query, ignoreCase = true) }
     }
     val totalSize = remember(entries) { entries.sumOf { it.size } }
+    val isGrid = category == "photos" || category == "videos"
+
+    fun openEntry(entry: VaultManager.Entry) {
+        val s = session
+        if (s == null) { onToast("Vault session expired"); return }
+        openVaultEntry(scope, s, entry, go, onToast)
+    }
+
+    fun toggleSelect(id: String) {
+        selected = if (id in selected) selected - id else selected + id
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -104,7 +143,7 @@ fun PrivatePhotosScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             ScreenHeader(
-                title = "Private Photos",
+                title = vaultTitle(category),
                 onBack = onBack,
                 actionIcon = Icons.Default.Sort,
                 onAction = { onToast("Sort options in next update") }
@@ -128,7 +167,7 @@ fun PrivatePhotosScreen(
                 TextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Search in Private Photos...", fontSize = 13.sp, color = TextMuted) },
+                    placeholder = { Text("Search in ${vaultTitle(category)}...", fontSize = 13.sp, color = TextMuted) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = TextFieldDefaults.colors(
@@ -144,7 +183,7 @@ fun PrivatePhotosScreen(
 
             Text("Category Details", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextDark)
             Text(
-                "${entries.size} Photos · ${formatFileSize(totalSize)}",
+                "${entries.size} ${vaultUnit(category)} · ${formatFileSize(totalSize)}",
                 fontSize = 12.sp, color = TextMuted,
                 modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
             )
@@ -154,13 +193,13 @@ fun PrivatePhotosScreen(
             } else if (filtered.isEmpty() && query.isBlank()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Image, contentDescription = null, tint = TextMuted, modifier = Modifier.size(44.dp))
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = TextMuted, modifier = Modifier.size(44.dp))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("No locked photos yet", fontSize = 14.sp, color = TextMuted)
-                        Text("Tap Add Photo to lock your first one", fontSize = 12.sp, color = TextMuted)
+                        Text("No locked ${vaultUnit(category).lowercase()} yet", fontSize = 14.sp, color = TextMuted)
+                        Text("Tap Add to lock your first one", fontSize = 12.sp, color = TextMuted)
                     }
                 }
-            } else {
+            } else if (isGrid) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.weight(1f),
@@ -168,36 +207,53 @@ fun PrivatePhotosScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(filtered, key = { it.id }) { entry ->
-                        VaultPhotoItem(
-                            entry = entry,
-                            session = session,
-                            selecting = selecting,
-                            isSelected = entry.id in selected,
-                            onClick = {
+                        if (category == "photos") {
+                            VaultPhotoItem(
+                                entry = entry, session = session,
+                                selecting = selecting, isSelected = entry.id in selected,
+                                onClick = { if (selecting) toggleSelect(entry.id) else openEntry(entry) }
+                            )
+                        } else {
+                            VaultVideoItem(
+                                entry = entry,
+                                selecting = selecting, isSelected = entry.id in selected,
+                                onClick = { if (selecting) toggleSelect(entry.id) else openEntry(entry) }
+                            )
+                        }
+                    }
+                    item { Spacer(modifier = Modifier.height(100.dp)) }
+                }
+            } else {
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(filtered, key = { it.id }) { entry ->
+                        val kind = kindFromMime(entry.mime)
+                        val date = remember(entry.addedAt) {
+                            SimpleDateFormat("MMM d, yyyy", Locale.US).format(Date(entry.addedAt))
+                        }
+                        FileRowItem(
+                            iconBg = mediaBg(kind),
+                            icon = mediaIcon(kind, entry.name),
+                            iconTint = mediaTint(kind),
+                            title = entry.name,
+                            subtitle = "${formatFileSize(entry.size)} · $date",
+                            onClick = { if (selecting) toggleSelect(entry.id) else openEntry(entry) },
+                            trailing = {
                                 if (selecting) {
-                                    selected = if (entry.id in selected) selected - entry.id else selected + entry.id
-                                } else {
-                                    scope.launch(Dispatchers.IO) {
-                                        try {
-                                            val tmp = session.decryptToTemp(entry)
-                                            val media = MediaItem(
-                                                uri = Uri.fromFile(tmp),
-                                                name = entry.name,
-                                                size = entry.size,
-                                                date = entry.addedAt,
-                                                mime = entry.mime,
-                                                kind = Kind.IMAGE
-                                            )
-                                            withContext(Dispatchers.Main) {
-                                                go(Route("photo", items = listOf(media)))
-                                            }
-                                        } catch (_: Exception) {
-                                            withContext(Dispatchers.Main) { onToast("Could not open photo") }
-                                        }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(if (entry.id in selected) Accent else LineColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (entry.id in selected) Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                     }
+                                } else {
+                                    Icon(Icons.Default.Lock, contentDescription = "Locked", tint = TextMuted, modifier = Modifier.size(16.dp))
                                 }
                             }
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                     item { Spacer(modifier = Modifier.height(100.dp)) }
                 }
@@ -209,7 +265,7 @@ fun PrivatePhotosScreen(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 90.dp)
+                    .padding(bottom = 24.dp)
                     .padding(horizontal = 20.dp)
                     .fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -219,19 +275,19 @@ fun PrivatePhotosScreen(
                         .weight(1f)
                         .shadow(6.dp, RoundedCornerShape(20.dp))
                         .clip(RoundedCornerShape(20.dp))
-                        .background(CardColor)
+                        .background(GlassColor)
                         .clickable { showAddSheet = true }
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Add Photo", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextDark)
+                    Text("Add ${vaultUnit(category).dropLast(1)}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextDark)
                 }
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .shadow(6.dp, RoundedCornerShape(20.dp))
                         .clip(RoundedCornerShape(20.dp))
-                        .background(CardColor)
+                        .background(GlassColor)
                         .clickable { selecting = true }
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
@@ -244,21 +300,19 @@ fun PrivatePhotosScreen(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 90.dp, start = 20.dp, end = 20.dp)
+                    .padding(bottom = 24.dp, start = 20.dp, end = 20.dp)
                     .fillMaxWidth()
                     .shadow(6.dp, RoundedCornerShape(20.dp))
                     .clip(RoundedCornerShape(20.dp))
-                    .background(CardColor)
+                    .background(GlassColor)
                     .padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    if (selected.isEmpty()) "Select photos" else "${selected.size} selected",
+                    if (selected.isEmpty()) "Select files" else "${selected.size} selected",
                     fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextDark,
-                    modifier = Modifier.clickable {
-                        selecting = false; selected = emptySet()
-                    }
+                    modifier = Modifier.clickable { selecting = false; selected = emptySet() }
                 )
                 Text(
                     "Delete",
@@ -273,7 +327,8 @@ fun PrivatePhotosScreen(
     if (showAddSheet) {
         AddPhotoBottomSheet(
             pin = pin,
-            category = "photos",
+            category = category,
+            title = vaultAddTitle(category),
             onDismiss = { showAddSheet = false },
             onLocked = { reload() },
             onToast = onToast
@@ -337,10 +392,7 @@ private fun VaultPhotoItem(
                 .clip(RoundedCornerShape(16.dp))
                 .background(PeachCard)
                 .clickable { onClick() }
-                .then(
-                    if (isSelected) Modifier.border(3.dp, Accent, RoundedCornerShape(16.dp))
-                    else Modifier
-                ),
+                .then(if (isSelected) Modifier.border(3.dp, Accent, RoundedCornerShape(16.dp)) else Modifier),
             contentAlignment = Alignment.Center
         ) {
             if (bmp != null) {
@@ -377,6 +429,59 @@ private fun VaultPhotoItem(
             ) {
                 Icon(Icons.Default.Lock, contentDescription = "Locked", tint = TextMuted, modifier = Modifier.size(12.dp))
             }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(entry.name, fontSize = 10.sp, color = TextDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(formatFileSize(entry.size), fontSize = 9.sp, color = TextMuted)
+    }
+}
+
+@Composable
+private fun VaultVideoItem(
+    entry: VaultManager.Entry,
+    selecting: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Column {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.78f)
+                .shadow(4.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF2B3445))
+                .clickable { onClick() }
+                .then(if (isSelected) Modifier.border(3.dp, Accent, RoundedCornerShape(16.dp)) else Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(34.dp))
+            if (selecting) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) Accent else Color.White.copy(alpha = 0.85f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.9f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = "Locked", tint = TextMuted, modifier = Modifier.size(12.dp))
+            }
+            Icon(Icons.Default.Videocam, contentDescription = null, tint = Color.White.copy(alpha = 0.25f),
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).size(18.dp))
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(entry.name, fontSize = 10.sp, color = TextDark, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -173,6 +173,7 @@ fun SettingsScreen(
             }
         }
         BottomDock(
+            modifier = Modifier.align(Alignment.BottomCenter),
             selected = "settings",
             onHome = { go(Route("dashboard")) },
             onBrowse = { go(Route("browse")) },
