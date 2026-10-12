@@ -53,7 +53,8 @@ private val BlueCard = Color(0xFFCFE0F5)
 
 @Composable
 fun VaultUnlockedScreen(
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onCategoryClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -199,9 +200,9 @@ fun VaultUnlockedScreen(
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    VaultCategoryCard("Private\nPhotos", PeachCard)
-                    VaultCategoryCard("Secure\nVideo", PurpleCard)
-                    VaultCategoryCard("Key\nDocuments", BlueCard)
+                    VaultCategoryCard("Private\nPhotos", PeachCard, onCategoryClick)
+                    VaultCategoryCard("Secure\nVideo", PurpleCard, onCategoryClick)
+                    VaultCategoryCard("Key\nDocuments", BlueCard, onCategoryClick)
                 }
                 Spacer(modifier = Modifier.height(20.dp))
             }
@@ -232,7 +233,8 @@ fun VaultUnlockedScreen(
 @Composable
 private fun VaultCategoryCard(
     title: String,
-    bgColor: Color
+    bgColor: Color,
+    onClick: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -241,7 +243,7 @@ private fun VaultCategoryCard(
             .shadow(4.dp, RoundedCornerShape(18.dp))
             .clip(RoundedCornerShape(18.dp))
             .background(bgColor)
-            .clickable { }
+            .clickable { onClick() }
             .padding(12.dp),
         contentAlignment = Alignment.Center
     ) {
