@@ -34,6 +34,15 @@
    - **Unlocked state UI** — LOCKED (2026-10-12)
    - Reference: `workspace/user/media_library/image/6f/6f1f3996489788220e3fa455fa2234c0eb38af2f9ee066d0aff164891d3ef97a.jpg`
    - Status card (Unlocked), Vault Highlights, Locked Categories (horizontal), Locked Files list
+   - **Private Photos grid** — LOCKED (2026-10-12)
+   - Reference: `workspace/user/media_library/image/8a/8a040ef8ba24788a0ba8dd276a581e85cf841397cd93c31d499e2b7e447a88a9.jpg`
+   - Search bar, Category Details (count + size), 3-col photo grid with lock badges, Add Photo + Bulk Options buttons
+   - **Add Photo bottom sheet** — LOCKED (2026-10-12)
+   - Reference: `workspace/user/media_library/image/64/64bba9775bb06512fa6beba1408cf2ca214af8ce7312b2da9171675f818dbf1b.jpg`
+   - Take Photo, Import from Gallery, Upload from Files, Cloud Import, Cancel
+   - **Delete Photo bottom sheet** — LOCKED (2026-10-12)
+   - Reference: `workspace/user/media_library/image/88/88cc7f3b5749b5a7598abdfdb7c00dd02cf1c3a8dbc58987269edf6fa06c4411.jpg`
+   - Remove from device, Remove from cloud, Delete from both, Cancel
 
 ## Features — v2 (Later)
 - Private Vault (PIN + encryption)
